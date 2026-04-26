@@ -1,0 +1,110 @@
+# PersistentVolumes — cluster-scoped (no namespace)
+# Uses hostPath for local/dev clusters (minikube, kind, k3s).
+# Replace with cloud provisioner StorageClass in managed clusters.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-auth-pv-dev
+  labels:
+    app: mongo-auth
+    env: dev
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/dev/mongo-auth
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-user-pv-dev
+  labels:
+    app: mongo-user
+    env: dev
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/dev/mongo-user
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-task-pv-dev
+  labels:
+    app: mongo-task
+    env: dev
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/dev/mongo-task
+
+---
+# PersistentVolumeClaims — namespace-scoped (dev)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-auth-pvc
+  namespace: dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 1Gi
+  selector:
+    matchLabels:
+      app: mongo-auth
+      env: dev
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-user-pvc
+  namespace: dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 1Gi
+  selector:
+    matchLabels:
+      app: mongo-user
+      env: dev
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-task-pvc
+  namespace: dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 1Gi
+  selector:
+    matchLabels:
+      app: mongo-task
+      env: dev

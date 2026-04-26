@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: prod
+data:
+  AUTH_SERVICE_URL: "http://auth-service:3001"
+  USER_SERVICE_URL: "http://user-service:3002"
+  TASK_SERVICE_URL: "http://task-service:3003"
+  ALLOWED_ORIGINS: "https://taskflow.example.com"
+  JWT_EXPIRES_IN: "1d"
+  NODE_ENV: "production"

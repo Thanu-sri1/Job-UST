@@ -1,0 +1,13 @@
+{
+  "name": "seed",
+  "version": "1.0.0",
+  "description": "Database seeder — 100 users, 10 tasks each",
+  "main": "seed.js",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "mongoose": "^8.4.1"
+  }
+}

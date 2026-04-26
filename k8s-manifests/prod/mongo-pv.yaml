@@ -1,0 +1,109 @@
+# Production PersistentVolumes — use cloud StorageClass in managed clusters.
+# For on-prem/bare-metal replace storageClassName: manual with your provisioner.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-auth-pv-prod
+  labels:
+    app: mongo-auth
+    env: prod
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/prod/mongo-auth
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-user-pv-prod
+  labels:
+    app: mongo-user
+    env: prod
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/prod/mongo-user
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-task-pv-prod
+  labels:
+    app: mongo-task
+    env: prod
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/prod/mongo-task
+
+---
+# PersistentVolumeClaims — prod namespace
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-auth-pvc
+  namespace: prod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      app: mongo-auth
+      env: prod
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-user-pvc
+  namespace: prod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      app: mongo-user
+      env: prod
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-task-pvc
+  namespace: prod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      app: mongo-task
+      env: prod
