@@ -3,6 +3,7 @@ import { taskAPI, userAPI } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
+import ServiceWorkspace from '../components/ServiceWorkspace';
 
 const FILTERS = ['all', 'todo', 'in-progress', 'done'];
 
@@ -147,6 +148,8 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+
+        <ServiceWorkspace tasks={tasks} user={user} />
       </main>
 
       {modalOpen && (
