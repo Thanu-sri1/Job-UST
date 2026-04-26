@@ -11,6 +11,6 @@ COPY . .
 RUN chown -R appuser:appgroup /app
 USER appuser
 EXPOSE 3012
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:3012/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=5 \
+  CMD node -e "require('http').get('http://localhost:3012/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 CMD ["npm", "start"]
