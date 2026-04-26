@@ -37,12 +37,12 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy build files
 COPY --from=builder /app/dist /usr/share/nginx/html
  
-# Copy custom nginx config (optional)
-# COPY nginx.conf /etc/nginx/nginx.conf
- 
-# Non-root user (nginx already runs non-root internally in alpine)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
  
 EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost/health || exit 1
  
 CMD ["nginx", "-g", "daemon off;"]
  

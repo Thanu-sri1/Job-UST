@@ -1,5 +1,4 @@
 services:
-  # ─── Databases ──────────────────────────────────────────────────────────────
   mongo-auth:
     image: mongo:7-jammy
     container_name: mongo-auth
@@ -8,15 +7,16 @@ services:
       MONGO_INITDB_DATABASE: auth-db
     volumes:
       - mongo_auth_data:/data/db
-    ports:
-      - "27017:27017"   # exposed so seed script can run from host
+    expose:
+      - "27017"
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 15s
 
   mongo-user:
     image: mongo:7-jammy
@@ -26,15 +26,16 @@ services:
       MONGO_INITDB_DATABASE: user-db
     volumes:
       - mongo_user_data:/data/db
-    ports:
-      - "27018:27017"   # exposed on different host port to avoid conflicts
+    expose:
+      - "27017"
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 15s
 
   mongo-task:
     image: mongo:7-jammy
@@ -44,17 +45,17 @@ services:
       MONGO_INITDB_DATABASE: task-db
     volumes:
       - mongo_task_data:/data/db
-    ports:
-      - "27019:27017"   # exposed on different host port to avoid conflicts
+    expose:
+      - "27017"
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 15s
 
-  # ─── Seeder (runs once, exits) ───────────────────────────────────────────────
   seeder:
     image: node:20-alpine
     container_name: seeder
@@ -65,7 +66,7 @@ services:
       AUTH_MONGODB_URI: mongodb://mongo-auth:27017/auth-db
       USER_MONGODB_URI: mongodb://mongo-user:27017/user-db
       TASK_MONGODB_URI: mongodb://mongo-task:27017/task-db
-    command: sh -c "npm install --silent && node seed.js"
+    command: sh -c "npm ci --silent && node seed.js"
     depends_on:
       mongo-auth:
         condition: service_healthy
@@ -75,18 +76,22 @@ services:
         condition: service_healthy
     networks:
       - internal
-    restart: "no"   # runs once and exits — does not restart
+    restart: "no"
 
-  # ─── Microservices ───────────────────────────────────────────────────────────
   auth-service:
     build:
       context: ./src/services/auth-service
       dockerfile: Dockerfile
     container_name: auth-service
     restart: unless-stopped
-    env_file: ./src/services/auth-service/.env
+    env_file:
+      - ./src/services/auth-service/.env
     environment:
+      PORT: "3001"
       MONGODB_URI: mongodb://mongo-auth:27017/auth-db
+      ALLOWED_ORIGINS: http://localhost,http://localhost:80
+    expose:
+      - "3001"
     depends_on:
       mongo-auth:
         condition: service_healthy
@@ -96,7 +101,8 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 20s
 
   user-service:
     build:
@@ -104,9 +110,14 @@ services:
       dockerfile: Dockerfile
     container_name: user-service
     restart: unless-stopped
-    env_file: ./src/services/user-service/.env
+    env_file:
+      - ./src/services/user-service/.env
     environment:
+      PORT: "3002"
       MONGODB_URI: mongodb://mongo-user:27017/user-db
+      ALLOWED_ORIGINS: http://localhost,http://localhost:80
+    expose:
+      - "3002"
     depends_on:
       mongo-user:
         condition: service_healthy
@@ -116,7 +127,8 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 20s
 
   task-service:
     build:
@@ -124,9 +136,14 @@ services:
       dockerfile: Dockerfile
     container_name: task-service
     restart: unless-stopped
-    env_file: ./src/services/task-service/.env
+    env_file:
+      - ./src/services/task-service/.env
     environment:
+      PORT: "3003"
       MONGODB_URI: mongodb://mongo-task:27017/task-db
+      ALLOWED_ORIGINS: http://localhost,http://localhost:80
+    expose:
+      - "3003"
     depends_on:
       mongo-task:
         condition: service_healthy
@@ -136,7 +153,8 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 20s
 
   api-gateway:
     build:
@@ -144,17 +162,23 @@ services:
       dockerfile: Dockerfile
     container_name: api-gateway
     restart: unless-stopped
-    env_file: ./src/services/api-gateway/.env
+    env_file:
+      - ./src/services/api-gateway/.env
     environment:
+      PORT: "3000"
       AUTH_SERVICE_URL: http://auth-service:3001
       USER_SERVICE_URL: http://user-service:3002
       TASK_SERVICE_URL: http://task-service:3003
-    ports:
-      - "3000:3000"
+      ALLOWED_ORIGINS: http://localhost,http://localhost:80
+    expose:
+      - "3000"
     depends_on:
-      - auth-service
-      - user-service
-      - task-service
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
     networks:
       - internal
       - public
@@ -162,7 +186,8 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -171,11 +196,18 @@ services:
     container_name: frontend
     restart: unless-stopped
     ports:
-      - "80:8080"
+      - "80:80"
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
     networks:
       - public
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
 
 volumes:
   mongo_auth_data:
