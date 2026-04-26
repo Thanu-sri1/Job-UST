@@ -152,12 +152,9 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      auth-service:
-        condition: service_healthy
-      user-service:
-        condition: service_healthy
-      task-service:
-        condition: service_healthy
+      - auth-service
+      - user-service
+      - task-service
     networks:
       - internal
       - public
