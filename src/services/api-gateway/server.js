@@ -14,6 +14,30 @@ const PORT = process.env.PORT || 3000;
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3002';
 const TASK_SERVICE_URL = process.env.TASK_SERVICE_URL || 'http://localhost:3003';
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3010';
+const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3011';
+const FILE_SERVICE_URL = process.env.FILE_SERVICE_URL || 'http://localhost:3012';
+const SEARCH_SERVICE_URL = process.env.SEARCH_SERVICE_URL || 'http://localhost:3013';
+const COMMENT_SERVICE_URL = process.env.COMMENT_SERVICE_URL || 'http://localhost:3014';
+const REMINDER_SERVICE_URL = process.env.REMINDER_SERVICE_URL || 'http://localhost:3015';
+
+const forwardUserHeaders = (proxyReqOpts, srcReq) => {
+  proxyReqOpts.headers['x-user-id'] = srcReq.headers['x-user-id'];
+  proxyReqOpts.headers['x-user-email'] = srcReq.headers['x-user-email'];
+  proxyReqOpts.headers['x-user-role'] = srcReq.headers['x-user-role'];
+  proxyReqOpts.headers['x-user-name'] = srcReq.headers['x-user-name'];
+  return proxyReqOpts;
+};
+
+const protectedProxy = (target, pathPrefix, serviceName) =>
+  proxy(target, {
+    proxyReqPathResolver: (req) => `${pathPrefix}${req.url}`,
+    proxyReqOptDecorator: forwardUserHeaders,
+    proxyErrorHandler: (err, res) => {
+      console.error(`${serviceName} proxy error:`, err.message);
+      res.status(502).json({ error: `${serviceName} unavailable` });
+    },
+  });
 
 // Security
 app.use(helmet());
@@ -52,13 +76,7 @@ app.use(
   authenticate,
   proxy(USER_SERVICE_URL, {
     proxyReqPathResolver: (req) => `/users${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
-      proxyReqOpts.headers['x-user-id'] = srcReq.headers['x-user-id'];
-      proxyReqOpts.headers['x-user-email'] = srcReq.headers['x-user-email'];
-      proxyReqOpts.headers['x-user-role'] = srcReq.headers['x-user-role'];
-      proxyReqOpts.headers['x-user-name'] = srcReq.headers['x-user-name'];
-      return proxyReqOpts;
-    },
+    proxyReqOptDecorator: forwardUserHeaders,
     proxyErrorHandler: (err, res) => {
       console.error('User service proxy error:', err.message);
       res.status(502).json({ error: 'User service unavailable' });
@@ -71,12 +89,7 @@ app.use(
   authenticate,
   proxy(TASK_SERVICE_URL, {
     proxyReqPathResolver: (req) => `/tasks${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
-      proxyReqOpts.headers['x-user-id'] = srcReq.headers['x-user-id'];
-      proxyReqOpts.headers['x-user-email'] = srcReq.headers['x-user-email'];
-      proxyReqOpts.headers['x-user-role'] = srcReq.headers['x-user-role'];
-      return proxyReqOpts;
-    },
+    proxyReqOptDecorator: forwardUserHeaders,
     proxyErrorHandler: (err, res) => {
       console.error('Task service proxy error:', err.message);
       res.status(502).json({ error: 'Task service unavailable' });
@@ -84,10 +97,27 @@ app.use(
   })
 );
 
+app.use('/api/notifications', authenticate, protectedProxy(NOTIFICATION_SERVICE_URL, '/notifications', 'Notification service'));
+app.use('/api/analytics', authenticate, protectedProxy(ANALYTICS_SERVICE_URL, '/analytics', 'Analytics service'));
+app.use('/api/files', authenticate, protectedProxy(FILE_SERVICE_URL, '/files', 'File service'));
+app.use('/api/search', authenticate, protectedProxy(SEARCH_SERVICE_URL, '/search', 'Search service'));
+app.use('/api/comments', authenticate, protectedProxy(COMMENT_SERVICE_URL, '/comments', 'Comment service'));
+app.use('/api/reminders', authenticate, protectedProxy(REMINDER_SERVICE_URL, '/reminders', 'Reminder service'));
+
 // Gateway health + upstream status
 app.get('/health', async (req, res) => {
   const axios = require('axios');
-  const services = { 'auth-service': AUTH_SERVICE_URL, 'user-service': USER_SERVICE_URL, 'task-service': TASK_SERVICE_URL };
+  const services = {
+    'auth-service': AUTH_SERVICE_URL,
+    'user-service': USER_SERVICE_URL,
+    'task-service': TASK_SERVICE_URL,
+    'notification-service': NOTIFICATION_SERVICE_URL,
+    'analytics-service': ANALYTICS_SERVICE_URL,
+    'file-service': FILE_SERVICE_URL,
+    'search-service': SEARCH_SERVICE_URL,
+    'comment-service': COMMENT_SERVICE_URL,
+    'reminder-service': REMINDER_SERVICE_URL,
+  };
   const checks = await Promise.allSettled(
     Object.entries(services).map(async ([name, url]) => {
       const resp = await axios.get(`${url}/health`, { timeout: 3000 });

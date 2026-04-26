@@ -56,6 +56,162 @@ services:
       retries: 10
       start_period: 15s
 
+  mongo-notification:
+    image: mongo:7-jammy
+    container_name: mongo-notification
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: notification-db
+    volumes:
+      - mongo_notification_data:/data/db
+    expose:
+      - "27017"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  mongo-analytics:
+    image: mongo:7-jammy
+    container_name: mongo-analytics
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: analytics-db
+    volumes:
+      - mongo_analytics_data:/data/db
+    expose:
+      - "27017"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  mongo-file:
+    image: mongo:7-jammy
+    container_name: mongo-file
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: file-db
+    volumes:
+      - mongo_file_data:/data/db
+    expose:
+      - "27017"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  mongo-comment:
+    image: mongo:7-jammy
+    container_name: mongo-comment
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: comment-db
+    volumes:
+      - mongo_comment_data:/data/db
+    expose:
+      - "27017"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  mongo-reminder:
+    image: mongo:7-jammy
+    container_name: mongo-reminder
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: reminder-db
+    volumes:
+      - mongo_reminder_data:/data/db
+    expose:
+      - "27017"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    expose:
+      - "5672"
+    ports:
+      - "15672:15672"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    expose:
+      - "9200"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: taskflow
+      MINIO_ROOT_PASSWORD: taskflow-secret
+    volumes:
+      - minio_data:/data
+    expose:
+      - "9000"
+    ports:
+      - "9001:9001"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   seeder:
     image: node:20-alpine
     container_name: seeder
@@ -156,6 +312,196 @@ services:
       retries: 5
       start_period: 20s
 
+  notification-service:
+    build:
+      context: ./src/services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    environment:
+      PORT: "3010"
+      MONGODB_URI: mongodb://mongo-notification:27017/notification-db
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+    expose:
+      - "3010"
+    depends_on:
+      mongo-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  analytics-service:
+    build:
+      context: ./src/services/analytics-service
+      dockerfile: Dockerfile
+    container_name: analytics-service
+    restart: unless-stopped
+    environment:
+      PORT: "3011"
+      MONGODB_URI: mongodb://mongo-analytics:27017/analytics-db
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+    expose:
+      - "3011"
+    depends_on:
+      mongo-analytics:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3011/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  file-service:
+    build:
+      context: ./src/services/file-service
+      dockerfile: Dockerfile
+    container_name: file-service
+    restart: unless-stopped
+    environment:
+      PORT: "3012"
+      MONGODB_URI: mongodb://mongo-file:27017/file-db
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: taskflow-files
+      S3_ACCESS_KEY: taskflow
+      S3_SECRET_KEY: taskflow-secret
+    expose:
+      - "3012"
+    depends_on:
+      mongo-file:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3012/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  search-service:
+    build:
+      context: ./src/services/search-service
+      dockerfile: Dockerfile
+    container_name: search-service
+    restart: unless-stopped
+    environment:
+      PORT: "3013"
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+      TASK_INDEX: taskflow-tasks
+    expose:
+      - "3013"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3013/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  comment-service:
+    build:
+      context: ./src/services/comment-service
+      dockerfile: Dockerfile
+    container_name: comment-service
+    restart: unless-stopped
+    environment:
+      PORT: "3014"
+      MONGODB_URI: mongodb://mongo-comment:27017/comment-db
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+    expose:
+      - "3014"
+    depends_on:
+      mongo-comment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3014/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  reminder-service:
+    build:
+      context: ./src/services/reminder-service
+      dockerfile: Dockerfile
+    container_name: reminder-service
+    restart: unless-stopped
+    environment:
+      PORT: "3015"
+      MONGODB_URI: mongodb://mongo-reminder:27017/reminder-db
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+      REMINDER_POLL_INTERVAL_MS: "30000"
+    expose:
+      - "3015"
+    depends_on:
+      mongo-reminder:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  task-event-adapter:
+    build:
+      context: ./src/services/task-event-adapter
+      dockerfile: Dockerfile
+    container_name: task-event-adapter
+    restart: unless-stopped
+    environment:
+      TASK_MONGODB_URI: mongodb://mongo-task:27017/task-db
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      EVENT_EXCHANGE: taskflow.events
+      TASK_EVENT_POLL_INTERVAL_MS: "30000"
+      TASK_EVENT_LOOKBACK_MS: "120000"
+    depends_on:
+      mongo-task:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+
   api-gateway:
     build:
       context: ./src/services/api-gateway
@@ -169,6 +515,12 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3001
       USER_SERVICE_URL: http://user-service:3002
       TASK_SERVICE_URL: http://task-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:3010
+      ANALYTICS_SERVICE_URL: http://analytics-service:3011
+      FILE_SERVICE_URL: http://file-service:3012
+      SEARCH_SERVICE_URL: http://search-service:3013
+      COMMENT_SERVICE_URL: http://comment-service:3014
+      REMINDER_SERVICE_URL: http://reminder-service:3015
       ALLOWED_ORIGINS: http://localhost,http://localhost:80
     expose:
       - "3000"
@@ -179,6 +531,18 @@ services:
         condition: service_healthy
       task-service:
         condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      analytics-service:
+        condition: service_healthy
+      file-service:
+        condition: service_healthy
+      search-service:
+        condition: service_healthy
+      comment-service:
+        condition: service_healthy
+      reminder-service:
+        condition: service_healthy
     networks:
       - internal
       - public
@@ -187,7 +551,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 30s
 
   frontend:
     build:
@@ -213,6 +577,13 @@ volumes:
   mongo_auth_data:
   mongo_user_data:
   mongo_task_data:
+  mongo_notification_data:
+  mongo_analytics_data:
+  mongo_file_data:
+  mongo_comment_data:
+  mongo_reminder_data:
+  elastic_data:
+  minio_data:
 
 networks:
   internal:
